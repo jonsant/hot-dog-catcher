@@ -1,0 +1,12 @@
+<canvas #gamecanvas [attr.width]="canvasWidth" [attr.height]="canvasHeight" tabindex="0"
+    style="border:1px solid #333; background:#f5f5f5; display:block; margin:auto;"></canvas>
+<div *ngIf="showMissedMsg && !showPlayButton" class="missed-msg"
+    [ngStyle]="{ opacity: missedMsgOpacity, transform: 'translateX(-50%) rotate(' + missedMsgAngle + 'deg)', left: 'calc(50% + ' + missedMsgOffsetX + 'px)' }">
+    {{ missedMsg }}
+</div>
+<div *ngIf="showPlayButton" class="play-btn-container">
+    <button class="play-btn" (click)="startGame()">Let's catch some dogs!</button>
+    <div *ngIf="gameOver" class="game-over-msg">
+        {{ quitByEscape ? 'Dog quitter!' : 'You\'re wasting too many delicious dogs!!' }}
+    </div>
+</div>

@@ -1,0 +1,102 @@
+canvas {
+    position: absolute;
+    top: 60px;
+    /* height of toolbar */
+    left: 0;
+    width: 100vw !important;
+    height: calc(100vh - 60px) !important;
+    max-width: 100vw;
+    max-height: calc(100vh - 60px);
+    border: none !important;
+    background: linear-gradient(to bottom, #87ceeb 0%, #b3e0ff 100%);
+    display: block;
+    margin: 0;
+    z-index: 1;
+}
+
+.toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    z-index: 10;
+}
+
+body,
+html,
+:host {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
+button {
+    display: initial;
+}
+
+.play-btn-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: calc(100vh - 60px);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.play-btn {
+    font-size: 2rem;
+    padding: 1.2rem 3.5rem;
+    background: #deb887;
+    color: #333;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition: background 0.2s;
+    outline: none;
+    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    letter-spacing: 2px;
+    text-shadow: 1px 2px 0 #fff7e0, 2px 3px 0 #cdaa7d;
+}
+
+.play-btn:hover {
+    background: #cdaa7d;
+}
+
+.game-over-msg {
+    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    font-size: 2.2rem;
+    color: #c1440e;
+    text-align: center;
+    margin-bottom: 2.5rem;
+    margin-top: -10rem;
+    /* Move the message further up above the play button */
+    text-shadow: 2px 4px 0 #fff7e0, 3px 6px 0 #cdaa7d;
+    font-weight: bold;
+}
+
+.missed-msg {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    font-size: 2rem;
+    color: #c1440e;
+    background: none;
+    border-radius: 16px;
+    padding: 0.7rem 2.2rem;
+    text-shadow: 1px 2px 0 #fff7e0, 2px 3px 0 #cdaa7d;
+    z-index: 30;
+    pointer-events: none;
+    text-align: center;
+    font-weight: bold;
+    transition: opacity 0.3s linear;
+}
