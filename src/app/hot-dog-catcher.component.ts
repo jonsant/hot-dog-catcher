@@ -14,6 +14,24 @@ interface HotDog {
     styleUrls: ['./hot-dog-catcher.component.scss']
 })
 export class HotDogCatcherComponent implements OnInit {
+    // Store default sizes for scaling
+    readonly DEFAULT_HAND_WIDTH = 200;
+    readonly DEFAULT_HAND_HEIGHT = 200;
+    readonly DEFAULT_HOTDOG_WIDTH = 80;
+    readonly DEFAULT_HOTDOG_HEIGHT = 140;
+
+    // Helper to set sizes based on device
+    setElementSizesForScreen() {
+        const isMobile = window.innerWidth <= 600;
+        const scale = isMobile ? 0.6 : 1;
+        this.handWidth = this.DEFAULT_HAND_WIDTH * scale;
+        this.handHeight = this.DEFAULT_HAND_HEIGHT * scale;
+        this.hotDogWidth = this.DEFAULT_HOTDOG_WIDTH * scale;
+        this.hotDogHeight = this.DEFAULT_HOTDOG_HEIGHT * scale;
+    }
+    private lastTouchX: number | null = null;
+    private touchActive: boolean = false;
+    private touchRAF: number | null = null;
     quitByEscape = false;
     leftPressed = false;
     rightPressed = false;
@@ -67,6 +85,7 @@ export class HotDogCatcherComponent implements OnInit {
     ];
 
     ngOnInit() {
+        this.setElementSizesForScreen();
         // Set canvas size to fill window below toolbar
         this.setCanvasSize();
         const canvas = this.canvasRef.nativeElement;
@@ -88,6 +107,64 @@ export class HotDogCatcherComponent implements OnInit {
             // Optionally, redraw if needed
             this.draw();
         };
+
+        // Touch event listeners for mobile/touchscreen support
+        canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
+        canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
+        canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
+        canvas.addEventListener('touchcancel', this.onTouchEnd.bind(this), { passive: false });
+    }
+    // Touch event handlers
+    onTouchStart(event: TouchEvent) {
+        if (event.touches.length > 0) {
+            this.touchActive = true;
+            const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+            const touch = event.touches[0];
+            const touchX = touch.clientX - rect.left;
+            this.lastTouchX = touchX;
+            // Center hand on touch
+            this.handX = Math.max(0, Math.min(this.canvasWidth - this.handWidth, touchX - this.handWidth / 2));
+            this.startTouchRAF();
+        }
+        event.preventDefault();
+    }
+
+    onTouchMove(event: TouchEvent) {
+        if (event.touches.length > 0) {
+            this.touchActive = true;
+            const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+            const touch = event.touches[0];
+            const touchX = touch.clientX - rect.left;
+            this.lastTouchX = touchX;
+            this.handX = Math.max(0, Math.min(this.canvasWidth - this.handWidth, touchX - this.handWidth / 2));
+            this.startTouchRAF();
+        }
+        event.preventDefault();
+    }
+
+    onTouchEnd(event: TouchEvent) {
+        this.touchActive = false;
+        this.lastTouchX = null;
+        if (this.touchRAF) {
+            cancelAnimationFrame(this.touchRAF);
+            this.touchRAF = null;
+        }
+        event.preventDefault();
+
+    }
+
+    // Continuously update hand position while touch is active
+    private startTouchRAF() {
+        if (this.touchRAF) return;
+        const update = () => {
+            if (this.touchActive && this.lastTouchX !== null) {
+                this.handX = Math.max(0, Math.min(this.canvasWidth - this.handWidth, this.lastTouchX - this.handWidth / 2));
+                this.touchRAF = requestAnimationFrame(update);
+            } else {
+                this.touchRAF = null;
+            }
+        };
+        this.touchRAF = requestAnimationFrame(update);
     }
 
     showRandomMissedMsg() {
@@ -199,6 +276,7 @@ export class HotDogCatcherComponent implements OnInit {
 
     @HostListener('window:resize')
     onResize() {
+        this.setElementSizesForScreen();
         this.setCanvasSize();
         this.resetGame();
     }

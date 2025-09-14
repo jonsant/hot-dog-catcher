@@ -100,3 +100,16 @@ button {
     font-weight: bold;
     transition: opacity 0.3s linear;
 }
+
+@media (max-width: 600px) {
+
+    .play-btn,
+    .missed-msg,
+    .game-over-msg {
+        font-size: 20px !important;
+    }
+
+    .missed-msg {
+        top: 170px !important;
+    }
+}
