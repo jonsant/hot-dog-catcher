@@ -14,6 +14,19 @@ interface HotDog {
     styleUrls: ['./hot-dog-catcher.component.scss']
 })
 export class HotDogCatcherComponent implements OnInit {
+    overSound: HTMLAudioElement | null = null;
+    music: HTMLAudioElement | null = null;
+    bellSound: HTMLAudioElement | null = null;
+    healthImg: HTMLImageElement | null = null;
+    healthImgLoaded = false;
+    catchSound: HTMLAudioElement | null = null;
+    // Mustard splash animation state
+    mustardSplashes: { x: number; y: number; vx: number; vy: number; life: number; }[] = [];
+    mustardSplashActive = false;
+    mustardSplashTimer: any = null;
+    hotDogInHandImg: HTMLImageElement | null = null;
+    hotDogInHandLoaded = false;
+    handHasHotDog = false;
     catchStreak = 0;
     positiveMsgList = [
         "Nice work!",
@@ -93,6 +106,33 @@ export class HotDogCatcherComponent implements OnInit {
     ];
 
     ngOnInit() {
+        // Load game over sound
+        this.overSound = new Audio('assets/over.wav');
+        this.overSound.volume = 0.18;
+        this.overSound.load();
+        // Pause/resume music on tab visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (this.music) {
+                if (document.hidden) {
+                    this.music.pause();
+                } else if (this.gameStarted && !this.gameOver) {
+                    this.music.play();
+                }
+            }
+        });
+        // Load background music
+        this.music = new Audio('assets/music.mp3');
+        this.music.loop = true;
+        this.music.volume = 0.45;
+        this.music.load();
+        // Extra reliability: restart music on end
+        this.music.addEventListener('ended', () => {
+            this.music!.currentTime = 0;
+            this.music!.play();
+        });
+        // Load bell sound
+        this.bellSound = new Audio('assets/bell.wav');
+        this.bellSound.load();
         this.setElementSizesForScreen();
         // Set canvas size to fill window below toolbar
         this.setCanvasSize();
@@ -107,14 +147,32 @@ export class HotDogCatcherComponent implements OnInit {
             // Optionally, redraw if needed
             this.draw();
         };
-        // Load hot dog image
+        // Load hot dog image (falling hot dogs)
         this.hotDogImg = new Image();
         this.hotDogImg.src = 'assets/dog.png';
         this.hotDogImg.onload = () => {
             this.hotDogLoaded = true;
-            // Optionally, redraw if needed
             this.draw();
         };
+        // Load hotdog-in-hand image
+        this.hotDogInHandImg = new Image();
+        this.hotDogInHandImg.src = 'assets/hotdog.png';
+        this.hotDogInHandImg.onload = () => {
+            this.hotDogInHandLoaded = true;
+            this.draw();
+        };
+
+        // Load health icon
+        this.healthImg = new Image();
+        this.healthImg.src = 'assets/health.png';
+        this.healthImg.onload = () => {
+            this.healthImgLoaded = true;
+            this.draw();
+        };
+
+        // Load catch sound
+        this.catchSound = new Audio('assets/catch.wav');
+        this.catchSound.load();
 
         // Touch event listeners for mobile/touchscreen support
         canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
@@ -211,6 +269,18 @@ export class HotDogCatcherComponent implements OnInit {
     }
 
     startGame() {
+        // Play background music at low volume
+        if (this.music) {
+            this.music.currentTime = 0;
+            this.music.volume = 0.60;
+            this.music.play();
+        }
+        // Play bell sound
+        if (this.bellSound) {
+            this.bellSound.currentTime = 0;
+            this.bellSound.volume = 0.60;
+            this.bellSound.play();
+        }
         this.quitByEscape = false;
         this.showPlayButton = false;
         this.gameStarted = true;
@@ -258,6 +328,14 @@ export class HotDogCatcherComponent implements OnInit {
                 this.gameStarted = false;
                 this.showPlayButton = true;
                 this.hotDogs = []; // Remove all hot dogs from the screen
+                this.score = 0;
+                this.level = 1;
+                this.health = 5;
+                // Stop music
+                if (this.music) {
+                    this.music.pause();
+                    this.music.currentTime = 0;
+                }
                 if (this.animationFrameId) {
                     cancelAnimationFrame(this.animationFrameId);
                     this.animationFrameId = null;
@@ -336,19 +414,12 @@ export class HotDogCatcherComponent implements OnInit {
         if (this.rightPressed) {
             this.handX = Math.min(this.canvasWidth - this.handWidth, this.handX + this.handSpeed);
         }
-        // Smooth hand movement
-        if (this.leftPressed) {
-            this.handX = Math.max(0, this.handX - this.handSpeed);
-        }
-        if (this.rightPressed) {
-            this.handX = Math.min(this.canvasWidth - this.handWidth, this.handX + this.handSpeed);
-        }
         // Move hot dogs
         for (const hotDog of this.hotDogs) {
             hotDog.y += hotDog.speed;
         }
-        // Check for catches
-        this.hotDogs = this.hotDogs.filter(hd => {
+        // Check for catches and misses
+        this.hotDogs = this.hotDogs.filter((hd: any) => {
             const handTop = this.handY + this.handHeight * 0.6;
             if (
                 hd.y + hd.height >= handTop &&
@@ -359,6 +430,15 @@ export class HotDogCatcherComponent implements OnInit {
                 this.catchStreak++;
                 if (this.catchStreak > 0 && this.catchStreak % 5 === 0) {
                     this.showRandomPositiveMsg();
+                }
+                // Show hot dog in hand after catch
+                this.handHasHotDog = true;
+                // Start mustard splash animation
+                this.startMustardSplash();
+                // Play catch sound
+                if (this.catchSound) {
+                    this.catchSound.currentTime = 0;
+                    this.catchSound.play();
                 }
                 // Level up every 10 catches
                 const newLevel = Math.floor(this.score / 100) + 1;
@@ -381,6 +461,8 @@ export class HotDogCatcherComponent implements OnInit {
                 this.health = Math.max(0, this.health - 1);
                 this.missedCount++;
                 this.catchStreak = 0;
+                // Remove hot dog from hand on miss
+                this.handHasHotDog = false;
                 if (this.missedCount % 2 === 0) {
                     this.showRandomMissedMsg();
                 }
@@ -391,6 +473,31 @@ export class HotDogCatcherComponent implements OnInit {
             }
             return true;
         });
+    }
+
+    startMustardSplash() {
+        // Create splash particles (e.g. 8)
+        const splashCount = 8;
+        const centerX = this.handX + this.handWidth / 2;
+        const baseY = this.handY + this.handHeight * 0.3;
+        this.mustardSplashes = [];
+        for (let i = 0; i < splashCount; i++) {
+            const angle = Math.PI / 2 + (Math.random() - 0.5) * Math.PI / 2; // upward, spread
+            const speed = 10 + Math.random() * 4; // Increased speed
+            this.mustardSplashes.push({
+                x: centerX,
+                y: baseY,
+                vx: Math.cos(angle) * speed,
+                vy: -Math.abs(Math.sin(angle) * speed),
+                life: 0
+            });
+        }
+        this.mustardSplashActive = true;
+        if (this.mustardSplashTimer) clearTimeout(this.mustardSplashTimer);
+        // End splash after 400ms
+        this.mustardSplashTimer = setTimeout(() => {
+            this.mustardSplashActive = false;
+        }, 400);
     }
 
     showRandomPositiveMsg() {
@@ -425,6 +532,17 @@ export class HotDogCatcherComponent implements OnInit {
     }
 
     endGame() {
+        // Play game over sound
+        if (this.overSound) {
+            this.overSound.currentTime = 0;
+            this.overSound.volume = 0.10;
+            this.overSound.play();
+        }
+        // Stop music if health is 0 (game over)
+        if (this.music) {
+            this.music.pause();
+            this.music.currentTime = 0;
+        }
         this.quitByEscape = false;
         this.gameOver = true;
         this.gameStarted = false;
@@ -457,12 +575,38 @@ export class HotDogCatcherComponent implements OnInit {
         skyGradient.addColorStop(1, '#b3e0ff'); // Lighter blue bottom
         this.ctx.fillStyle = skyGradient;
         this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
-        // Draw hand (bun)
-        if (this.bunLoaded && this.bunImg) {
+        // Draw hand (bun or hot dog in bun)
+        if (this.handHasHotDog && this.hotDogInHandLoaded && this.hotDogInHandImg) {
+            // Draw hotdog.png just a tiny bit larger than before
+            const hdW = this.handWidth * 1.22;
+            const hdH = this.handHeight * 0.86;
+            const hdX = this.handX - (hdW - this.handWidth) / 2;
+            const hdY = this.handY + (this.handHeight - hdH) / 2;
+            this.ctx.drawImage(this.hotDogInHandImg, hdX, hdY, hdW, hdH);
+        } else if (this.bunLoaded && this.bunImg) {
             this.ctx.drawImage(this.bunImg, this.handX, this.handY, this.handWidth, this.handHeight);
         } else {
             this.ctx.fillStyle = '#deb887';
             this.ctx.fillRect(this.handX, this.handY, this.handWidth, this.handHeight);
+        }
+
+        // Mustard splash animation (draw after hand)
+        if (this.mustardSplashActive && this.mustardSplashes.length > 0) {
+            for (const p of this.mustardSplashes) {
+                // Animate
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.7; // gravity
+                p.life++;
+                // Draw splash (yellow arc or ellipse)
+                this.ctx.save();
+                this.ctx.globalAlpha = Math.max(0, 1 - p.life / 18);
+                this.ctx.fillStyle = '#e6b800';
+                this.ctx.beginPath();
+                this.ctx.ellipse(p.x, p.y, 16, 7, Math.random() * Math.PI, 0, 2 * Math.PI); // Larger ellipse
+                this.ctx.fill();
+                this.ctx.restore();
+            }
         }
         // Draw hot dogs only if game is not over
         if (!this.gameOver) {
@@ -487,9 +631,20 @@ export class HotDogCatcherComponent implements OnInit {
         // Draw level below score
         this.ctx.font = "bold 22px 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif";
         this.ctx.fillText('Level: ' + this.level, 10, 55);
-        // Draw health below level
-        this.ctx.fillStyle = '#e74c3c';
-        this.ctx.fillText('Health: ' + this.health, 10, 85);
+        // Draw health icon and value below level
+        const healthIconY = 85;
+        if (this.healthImgLoaded && this.healthImg) {
+            this.ctx.drawImage(this.healthImg, 10, healthIconY, 28, 28);
+            this.ctx.fillStyle = '#e74c3c';
+            this.ctx.font = "bold 22px 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif";
+            this.ctx.textBaseline = 'top';
+            this.ctx.fillText('x ' + this.health, 44, healthIconY + 3);
+        } else {
+            this.ctx.fillStyle = '#e74c3c';
+            this.ctx.font = "bold 22px 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif";
+            this.ctx.textBaseline = 'top';
+            this.ctx.fillText('Health: ' + this.health, 10, healthIconY);
+        }
         // ...existing code...
     }
 
