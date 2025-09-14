@@ -6,6 +6,7 @@ interface HotDog {
     width: number;
     height: number;
     speed: number;
+    dx?: number; // for diagonal movement if hit by plane
 }
 
 @Component({
@@ -14,6 +15,87 @@ interface HotDog {
     styleUrls: ['./hot-dog-catcher.component.scss']
 })
 export class HotDogCatcherComponent implements OnInit {
+
+    // Plane variables
+    planeImg: HTMLImageElement | null = null;
+    planeImgLoaded = false;
+    planeActive = false;
+    planeX = 0;
+    planeY = 0;
+    planeSpeed = 0;
+    planeWidth = 100;
+    planeHeight = 40;
+    nextPlaneTime = 0;
+
+    // Plane2 variables
+    plane2Img: HTMLImageElement | null = null;
+    plane2ImgLoaded = false;
+    plane2Active = false;
+    plane2X = 0;
+    plane2Y = 0;
+    plane2Speed = 0;
+    plane2Width = 100;
+    plane2Height = 40;
+    nextPlane2Time = 0;
+
+
+
+    stopGame() {
+        // Cancel animation
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        // Stop music
+        if (this.music) {
+            this.music.pause();
+            this.music.currentTime = 0;
+        }
+        // Reset all state
+        this.gameStarted = false;
+        this.gameOver = false;
+        this.showPlayButton = true;
+        this.paused = false;
+        this.quitByEscape = false;
+        this.handX = (this.canvasWidth - this.handWidth) / 2;
+        this.hotDogs = [];
+        this.score = 0;
+        this.level = 1;
+        this.hotDogSpeed = 3;
+        this.health = 5;
+        this.missedCount = 0;
+        this.showMissedMsg = false;
+        this.missedMsg = '';
+        this.missedMsgOpacity = 1;
+        this.lastHotDogTime = performance.now();
+        this.handHasHotDog = false;
+        this.mustardSplashActive = false;
+        this.mustardSplashes = [];
+        this.leftPressed = false;
+        this.rightPressed = false;
+        // Clear canvas
+        if (this.ctx) {
+            this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+        }
+        // Redraw background
+        this.draw();
+    }
+    paused = false;
+
+    togglePause() {
+        if (!this.gameStarted || this.gameOver) return;
+        this.paused = !this.paused;
+        if (this.paused) {
+            if (this.music) this.music.pause();
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId);
+                this.animationFrameId = null;
+            }
+        } else {
+            if (this.music) this.music.play();
+            this.gameLoop();
+        }
+    }
     overSound: HTMLAudioElement | null = null;
     music: HTMLAudioElement | null = null;
     bellSound: HTMLAudioElement | null = null;
@@ -70,7 +152,10 @@ export class HotDogCatcherComponent implements OnInit {
     handHeight = 200;
     handX = 160;
     handY = 550;
-    handSpeed = 4; // Even slower hand movement for precise control
+    handSpeed = 10; // Increased speed for faster keyboard movement
+
+    // Store the base hand speed for keyboard movement
+    readonly BASE_HAND_SPEED = 10;
 
     // Hot dogs
     hotDogs: HotDog[] = [];
@@ -106,6 +191,22 @@ export class HotDogCatcherComponent implements OnInit {
     ];
 
     ngOnInit() {
+        // Load plane image
+        this.planeImg = new Image();
+        this.planeImg.src = 'assets/plane.png';
+        this.planeImg.onload = () => {
+            this.planeImgLoaded = true;
+        };
+        // Load plane2 image
+        this.plane2Img = new Image();
+        this.plane2Img.src = 'assets/plane2.png';
+        this.plane2Img.onload = () => {
+            this.plane2ImgLoaded = true;
+        };
+        // Set initial next plane time
+        this.scheduleNextPlane();
+        // Set initial next plane2 time
+        this.scheduleNextPlane2();
         // Load game over sound
         this.overSound = new Audio('assets/over.wav');
         this.overSound.volume = 0.18;
@@ -293,6 +394,7 @@ export class HotDogCatcherComponent implements OnInit {
         this.showMissedMsg = false;
         this.missedMsg = '';
         this.missedMsgOpacity = 1;
+        this.handSpeed = this.BASE_HAND_SPEED;
         this.gameLoop();
     }
 
@@ -309,6 +411,16 @@ export class HotDogCatcherComponent implements OnInit {
         this.missedMsg = '';
         this.missedMsgOpacity = 1;
         this.lastHotDogTime = performance.now();
+        // Reset plane
+        this.planeActive = false;
+        this.scheduleNextPlane();
+        // Reset plane2
+        this.plane2Active = false;
+        if (this.level >= 3) {
+            this.scheduleNextPlane2();
+        } else {
+            this.nextPlane2Time = 0;
+        }
         // Clear canvas
         if (this.ctx) {
             this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
@@ -327,11 +439,10 @@ export class HotDogCatcherComponent implements OnInit {
                 this.gameOver = true;
                 this.gameStarted = false;
                 this.showPlayButton = true;
-                this.hotDogs = []; // Remove all hot dogs from the screen
+                this.hotDogs = [];
                 this.score = 0;
                 this.level = 1;
                 this.health = 5;
-                // Stop music
                 if (this.music) {
                     this.music.pause();
                     this.music.currentTime = 0;
@@ -341,6 +452,12 @@ export class HotDogCatcherComponent implements OnInit {
                     this.animationFrameId = null;
                 }
                 this.draw();
+            }
+        } else if (event.key === ' ' || event.code === 'Space') {
+            // Spacebar toggles pause/play
+            if (this.gameStarted && !this.gameOver) {
+                this.togglePause();
+                event.preventDefault();
             }
         }
     }
@@ -369,17 +486,24 @@ export class HotDogCatcherComponent implements OnInit {
     }
 
     setCanvasSize() {
-        // 60px toolbar height
+        // Use visualViewport height if available for better mobile support
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         this.canvasWidth = window.innerWidth;
-        this.canvasHeight = window.innerHeight - 60;
+        // Add a bottom margin so the hand is always visible above browser toolbars (especially on mobile)
+        const bottomMargin = 32; // px, adjust as needed
+        this.canvasHeight = viewportHeight - 60 - bottomMargin;
         if (this.canvasRef && this.canvasRef.nativeElement) {
             this.canvasRef.nativeElement.width = this.canvasWidth;
             this.canvasRef.nativeElement.height = this.canvasHeight;
         }
-        // Adjust hand position to bottom
-        this.handY = this.canvasHeight - this.handHeight * 0.94;
+        // Adjust hand position to bottom, ensuring it's always fully visible
+        this.handY = this.canvasHeight - this.handHeight - 8; // 8px padding from bottom
         // Ensure hand stays in bounds if resized
         this.handX = Math.max(0, Math.min(this.handX, this.canvasWidth - this.handWidth));
+        // Adjust plane Y position if needed
+        this.planeY = Math.max(0, Math.floor(this.canvasHeight * 0.08));
+        // Adjust plane2 Y position (middle of screen)
+        this.plane2Y = Math.floor(this.canvasHeight * 0.5) - Math.floor(this.plane2Height / 2);
     }
 
     spawnHotDog() {
@@ -395,16 +519,93 @@ export class HotDogCatcherComponent implements OnInit {
     }
 
     gameLoop = () => {
-        if (!this.gameStarted) return;
+        if (!this.gameStarted || this.paused) return;
         const now = performance.now();
         if (now - this.lastHotDogTime > this.hotDogInterval) {
             this.spawnHotDog();
             this.lastHotDogTime = now;
         }
+        // Plane logic
+        this.updatePlane(now);
+        this.updatePlane2(now);
         this.update();
         this.draw();
         this.animationFrameId = requestAnimationFrame(this.gameLoop);
     };
+
+    // Plane2 logic
+    scheduleNextPlane2() {
+        // Only schedule plane2 if level >= 3
+        if (this.level < 3) {
+            this.nextPlane2Time = 0;
+            return;
+        }
+        // Plane2 appears at random intervals, similar scaling as plane
+        const minBase = 4000; // ms
+        const maxBase = 9000; // ms
+        const levelFactor = Math.min(this.level, 10);
+        const minInterval = Math.max(1500, minBase - levelFactor * 250);
+        const maxInterval = Math.max(3000, maxBase - levelFactor * 600);
+        const interval = minInterval + Math.random() * (maxInterval - minInterval);
+        this.nextPlane2Time = performance.now() + interval;
+    }
+
+    updatePlane2(now: number) {
+        if (this.level < 3) {
+            this.plane2Active = false;
+            return;
+        }
+        if (!this.plane2Active && now > this.nextPlane2Time && this.plane2ImgLoaded) {
+            // Always start plane2 from left, moving right
+            this.plane2Active = true;
+            this.plane2Speed = 2.5 + Math.random() * 1.5;
+            this.plane2Width = 100 + Math.random() * 40;
+            this.plane2Height = 60 + Math.random() * 18;
+            this.plane2Y = Math.floor(this.canvasHeight * 0.5) - Math.floor(this.plane2Height / 2);
+            this.plane2X = -this.plane2Width;
+        }
+        if (this.plane2Active) {
+            this.plane2X += this.plane2Speed;
+            // If plane2 is off screen, deactivate and schedule next
+            if (this.plane2X > this.canvasWidth) {
+                this.plane2Active = false;
+                this.scheduleNextPlane2();
+            }
+        }
+    }
+
+    // Plane logic
+    scheduleNextPlane() {
+        // Plane appears more frequently as level increases
+        // Minimum interval: 1s, maximum interval: 7s, scales with level
+        const minBase = 3000; // ms
+        const maxBase = 7000; // ms
+        const levelFactor = Math.min(this.level, 10); // Cap effect at level 10
+        const minInterval = Math.max(1000, minBase - levelFactor * 200); // never less than 1s
+        const maxInterval = Math.max(2000, maxBase - levelFactor * 500); // never less than 2s
+        const interval = minInterval + Math.random() * (maxInterval - minInterval);
+        this.nextPlaneTime = performance.now() + interval;
+    }
+
+    updatePlane(now: number) {
+        if (!this.planeActive && now > this.nextPlaneTime && this.planeImgLoaded) {
+            // Always start plane from right, moving left
+            this.planeActive = true;
+            this.planeSpeed = - (3 + Math.random() * 2); // Always negative for right-to-left
+            this.planeWidth = 100 + Math.random() * 40;
+            this.planeHeight = 60 + Math.random() * 18;
+            this.planeY = Math.max(0, Math.floor(this.canvasHeight * 0.08));
+            this.planeX = this.canvasWidth;
+        }
+        if (this.planeActive) {
+            this.planeX += this.planeSpeed;
+            // If plane is off screen, deactivate and schedule next
+            if ((this.planeSpeed > 0 && this.planeX > this.canvasWidth) || (this.planeSpeed < 0 && this.planeX < -this.planeWidth)) {
+                this.planeActive = false;
+                this.scheduleNextPlane();
+            }
+        }
+    }
 
     update() {
         // Smooth hand movement
@@ -414,9 +615,50 @@ export class HotDogCatcherComponent implements OnInit {
         if (this.rightPressed) {
             this.handX = Math.min(this.canvasWidth - this.handWidth, this.handX + this.handSpeed);
         }
-        // Move hot dogs
+        // Move hot dogs (check for plane collision and bounce off edges)
         for (const hotDog of this.hotDogs) {
-            hotDog.y += hotDog.speed;
+            if (typeof hotDog.dx === 'number') {
+                hotDog.x += hotDog.dx;
+                hotDog.y += hotDog.speed;
+                // Bounce off left edge
+                if (hotDog.x < 0) {
+                    hotDog.x = 0;
+                    hotDog.dx = Math.abs(hotDog.dx);
+                }
+                // Bounce off right edge
+                if (hotDog.x + hotDog.width > this.canvasWidth) {
+                    hotDog.x = this.canvasWidth - hotDog.width;
+                    hotDog.dx = -Math.abs(hotDog.dx);
+                }
+            } else {
+                hotDog.y += hotDog.speed;
+                // Check for collision with plane
+                if (
+                    this.planeActive &&
+                    this.planeImgLoaded &&
+                    hotDog.y < this.planeY + this.planeHeight &&
+                    hotDog.y + hotDog.height > this.planeY &&
+                    hotDog.x < this.planeX + this.planeWidth &&
+                    hotDog.x + hotDog.width > this.planeX
+                ) {
+                    // Start falling diagonally (random left or right)
+                    hotDog.dx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
+                    // Optionally increase fall speed a bit
+                    hotDog.speed += 1.5;
+                }
+                // Check for collision with plane2 (left-to-right)
+                if (
+                    this.plane2Active &&
+                    this.plane2ImgLoaded &&
+                    hotDog.y < this.plane2Y + this.plane2Height &&
+                    hotDog.y + hotDog.height > this.plane2Y &&
+                    hotDog.x < this.plane2X + this.plane2Width &&
+                    hotDog.x + hotDog.width > this.plane2X
+                ) {
+                    hotDog.dx = (Math.random() < 0.5 ? -1 : 1) * (2 + Math.random() * 2);
+                    hotDog.speed += 1.5;
+                }
+            }
         }
         // Check for catches and misses
         this.hotDogs = this.hotDogs.filter((hd: any) => {
@@ -450,9 +692,8 @@ export class HotDogCatcherComponent implements OnInit {
                     // Optionally, decrease interval for more frequent hot dogs
                     this.hotDogInterval = Math.max(400, this.hotDogInterval - 60 - 5 * (this.level - 1));
                     this.health += 1; // Increase health by one for each level up
-                    if (this.level % 2 === 0) {
-                        this.handSpeed += 0.5; // Slightly increase hand speed every second level
-                    }
+                    // Increase hand speed a bit every level
+                    this.handSpeed = this.BASE_HAND_SPEED + (this.level - 1) * 1.2;
                 }
                 return false;
             }
@@ -575,6 +816,33 @@ export class HotDogCatcherComponent implements OnInit {
         skyGradient.addColorStop(1, '#b3e0ff'); // Lighter blue bottom
         this.ctx.fillStyle = skyGradient;
         this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+
+        // Draw plane if active
+        if (this.planeActive && this.planeImgLoaded && this.planeImg) {
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.92;
+            this.ctx.drawImage(
+                this.planeImg,
+                this.planeX,
+                this.planeY,
+                this.planeWidth,
+                this.planeHeight
+            );
+            this.ctx.restore();
+        }
+        // Draw plane2 if active
+        if (this.plane2Active && this.plane2ImgLoaded && this.plane2Img) {
+            this.ctx.save();
+            this.ctx.globalAlpha = 0.92;
+            this.ctx.drawImage(
+                this.plane2Img,
+                this.plane2X,
+                this.plane2Y,
+                this.plane2Width,
+                this.plane2Height
+            );
+            this.ctx.restore();
+        }
         // Draw hand (bun or hot dog in bun)
         if (this.handHasHotDog && this.hotDogInHandLoaded && this.hotDogInHandImg) {
             // Draw hotdog.png just a tiny bit larger than before

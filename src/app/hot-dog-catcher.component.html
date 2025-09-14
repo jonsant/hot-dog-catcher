@@ -7,6 +7,6 @@
 <div *ngIf="showPlayButton" class="play-btn-container">
     <button class="play-btn" (click)="startGame()">Let's catch some dogs!</button>
     <div *ngIf="gameOver" class="game-over-msg">
-        {{ quitByEscape ? 'Dog quitter!' : 'You\'re wasting too many delicious dogs!!' }}
+        {{ quitByEscape ? 'It\'s over! Dog quitter!' : 'You\'re wasting too many delicious dogs!!' }}
     </div>
 </div>
