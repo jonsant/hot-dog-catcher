@@ -72,7 +72,7 @@
     font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
     letter-spacing: 2px;
     text-shadow: 1px 2px 0 #fff7e0, 2px 3px 0 #cdaa7d;
-    font-size: 2rem;
+    font-size: 1.2rem;
   }
 
   .content {
@@ -317,6 +317,11 @@
   <img width="40" alt="Hot Dog" src="assets/dog.png" />
   <span>Hot Dog Catcher!</span>
   <div class="spacer"></div>
+  <img *ngIf="game?.gameStarted" [src]="game.paused ? 'assets/play.png' : 'assets/pause.png'"
+    [alt]="game.paused ? 'Play' : 'Pause'" width="40" style="margin-right:16px; cursor:pointer;"
+    (click)="onPauseClick()" />
+  <img *ngIf="game?.gameStarted" src="assets/stop.png" alt="Stop" width="40" style="margin-right:16px; cursor:pointer;"
+    (click)="onStopClick()" />
 </div>
 
-<app-hot-dog-catcher></app-hot-dog-catcher>
+<app-hot-dog-catcher #game></app-hot-dog-catcher>
