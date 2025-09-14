@@ -87,7 +87,7 @@ export class HotDogCatcherComponent implements OnInit {
     missedMsgTimeout: any = null;
     missedMsgOpacity = 1;
     missedMsgList = [
-        "Hot Dog catcher? More like dog waster!!!",
+        "Such a hot dog waster!!!!!!",
         "You're wasting delicious dogs!!!",
         "You need practice, for sure!"
     ];
