@@ -61,7 +61,7 @@ button {
     cursor: pointer;
     transition: background 0.2s;
     outline: none;
-    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    font-family: 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif;
     letter-spacing: 2px;
     text-shadow: 1px 2px 0 #fff7e0, 2px 3px 0 #cdaa7d;
 }
@@ -71,15 +71,17 @@ button {
 }
 
 .game-over-msg {
-    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    font-family: 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif;
     font-size: 2.2rem;
     color: #c1440e;
     text-align: center;
     margin-bottom: 2.5rem;
-    margin-top: -10rem;
-    /* Move the message further up above the play button */
-    text-shadow: 2px 4px 0 #fff7e0, 3px 6px 0 #cdaa7d;
+    margin-top: 0;
+    /* Remove or reduce shadow for readability */
+    /* text-shadow: 2px 4px 0 #fff7e0, 3px 6px 0 #cdaa7d; */
+    text-shadow: none;
     font-weight: bold;
+    order: -1;
 }
 
 .missed-msg {
@@ -87,13 +89,13 @@ button {
     top: 70px;
     left: 50%;
     transform: translateX(-50%);
-    font-family: 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif;
+    font-family: 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif;
     font-size: 2rem;
     color: #c1440e;
     background: none;
     border-radius: 16px;
     padding: 0.7rem 2.2rem;
-    text-shadow: 1px 2px 0 #fff7e0, 2px 3px 0 #cdaa7d;
+    text-shadow: none;
     z-index: 30;
     pointer-events: none;
     text-align: center;

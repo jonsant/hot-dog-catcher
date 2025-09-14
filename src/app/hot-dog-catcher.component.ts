@@ -14,6 +14,14 @@ interface HotDog {
     styleUrls: ['./hot-dog-catcher.component.scss']
 })
 export class HotDogCatcherComponent implements OnInit {
+    catchStreak = 0;
+    positiveMsgList = [
+        "Nice work!",
+        "You're getting good at this!",
+        "So much deliciousness!",
+        "Keep it up!"
+    ];
+    lastPositiveMsgIdx: number | null = null;
     // Store default sizes for scaling
     readonly DEFAULT_HAND_WIDTH = 200;
     readonly DEFAULT_HAND_HEIGHT = 200;
@@ -80,8 +88,8 @@ export class HotDogCatcherComponent implements OnInit {
     missedMsgOpacity = 1;
     missedMsgList = [
         "Hot Dog catcher? More like dog waster!!!",
-        "God! You're wasting delicious dogs!!!",
-        "Oh you need practice, for sure!"
+        "You're wasting delicious dogs!!!",
+        "You need practice, for sure!"
     ];
 
     ngOnInit() {
@@ -249,6 +257,7 @@ export class HotDogCatcherComponent implements OnInit {
                 this.gameOver = true;
                 this.gameStarted = false;
                 this.showPlayButton = true;
+                this.hotDogs = []; // Remove all hot dogs from the screen
                 if (this.animationFrameId) {
                     cancelAnimationFrame(this.animationFrameId);
                     this.animationFrameId = null;
@@ -347,6 +356,10 @@ export class HotDogCatcherComponent implements OnInit {
                 hd.x < this.handX + this.handWidth
             ) {
                 this.score += 10;
+                this.catchStreak++;
+                if (this.catchStreak > 0 && this.catchStreak % 5 === 0) {
+                    this.showRandomPositiveMsg();
+                }
                 // Level up every 10 catches
                 const newLevel = Math.floor(this.score / 100) + 1;
                 if (newLevel > this.level) {
@@ -363,6 +376,7 @@ export class HotDogCatcherComponent implements OnInit {
             if (hd.y >= this.canvasHeight) {
                 this.health = Math.max(0, this.health - 1);
                 this.missedCount++;
+                this.catchStreak = 0;
                 if (this.missedCount % 2 === 0) {
                     this.showRandomMissedMsg();
                 }
@@ -373,6 +387,37 @@ export class HotDogCatcherComponent implements OnInit {
             }
             return true;
         });
+    }
+
+    showRandomPositiveMsg() {
+        if (this.missedMsgTimeout) {
+            clearTimeout(this.missedMsgTimeout);
+        }
+        let idx: number;
+        do {
+            idx = Math.floor(Math.random() * this.positiveMsgList.length);
+        } while (this.positiveMsgList.length > 1 && idx === this.lastPositiveMsgIdx);
+        this.lastPositiveMsgIdx = idx;
+        this.missedMsg = this.positiveMsgList[idx];
+        this.missedMsgAngle = (Math.random() * 20 - 10);
+        this.missedMsgOffsetX = Math.floor(Math.random() * 120 - 60);
+        this.showMissedMsg = true;
+        this.missedMsgOpacity = 1;
+        // Fade out over 3 seconds
+        const fadeDuration = 3000;
+        const fadeSteps = 30;
+        let step = 0;
+        const fade = () => {
+            step++;
+            this.missedMsgOpacity = 1 - step / fadeSteps;
+            if (step < fadeSteps) {
+                this.missedMsgTimeout = setTimeout(fade, fadeDuration / fadeSteps);
+            } else {
+                this.showMissedMsg = false;
+                this.missedMsgOpacity = 1;
+            }
+        };
+        fade();
     }
 
     endGame() {
@@ -415,41 +460,32 @@ export class HotDogCatcherComponent implements OnInit {
             this.ctx.fillStyle = '#deb887';
             this.ctx.fillRect(this.handX, this.handY, this.handWidth, this.handHeight);
         }
-        // Draw hot dogs
-        for (const hotDog of this.hotDogs) {
-            if (this.hotDogLoaded && this.hotDogImg) {
-                this.ctx.drawImage(this.hotDogImg, hotDog.x, hotDog.y, hotDog.width, hotDog.height);
-            } else {
-                this.ctx.fillStyle = '#c1440e';
-                this.ctx.fillRect(hotDog.x, hotDog.y, hotDog.width, hotDog.height);
+        // Draw hot dogs only if game is not over
+        if (!this.gameOver) {
+            for (const hotDog of this.hotDogs) {
+                if (this.hotDogLoaded && this.hotDogImg) {
+                    this.ctx.drawImage(this.hotDogImg, hotDog.x, hotDog.y, hotDog.width, hotDog.height);
+                } else {
+                    this.ctx.fillStyle = '#c1440e';
+                    this.ctx.fillRect(hotDog.x, hotDog.y, hotDog.width, hotDog.height);
+                }
             }
         }
         // Draw score
         this.ctx.fillStyle = '#222';
-        this.ctx.font = "bold 28px 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif";
+        this.ctx.font = "bold 28px 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif";
         this.ctx.textBaseline = 'top';
-        this.ctx.shadowColor = '#fff7e0';
-        this.ctx.shadowBlur = 0;
-        this.ctx.shadowOffsetX = 1;
-        this.ctx.shadowOffsetY = 2;
-        this.ctx.fillText('Score: ' + this.score, 10, 20);
-        this.ctx.shadowColor = '#cdaa7d';
-        this.ctx.shadowOffsetX = 2;
-        this.ctx.shadowOffsetY = 3;
-        // Draw level below score
-        this.ctx.font = "bold 22px 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif";
-        this.ctx.fillText('Level: ' + this.level, 10, 55);
-        // Draw health below level
-        this.ctx.font = "bold 22px 'Comic Sans MS', 'Comic Sans', 'Chalkboard SE', 'Comic Neue', cursive, sans-serif";
-        this.ctx.shadowColor = '#e74c3c';
-        this.ctx.shadowOffsetX = 1;
-        this.ctx.shadowOffsetY = 2;
-        this.ctx.fillStyle = '#e74c3c';
-        this.ctx.fillText('Health: ' + this.health, 10, 85);
-        // Reset shadow
         this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
         this.ctx.shadowOffsetX = 0;
         this.ctx.shadowOffsetY = 0;
+        this.ctx.fillText('Score: ' + this.score, 10, 20);
+        // Draw level below score
+        this.ctx.font = "bold 22px 'Baloo 2', 'Fredoka', 'Quicksand', 'Arial Rounded MT Bold', Arial, sans-serif";
+        this.ctx.fillText('Level: ' + this.level, 10, 55);
+        // Draw health below level
+        this.ctx.fillStyle = '#e74c3c';
+        this.ctx.fillText('Health: ' + this.health, 10, 85);
         // ...existing code...
     }
 
