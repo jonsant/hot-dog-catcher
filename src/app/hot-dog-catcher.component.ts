@@ -364,7 +364,11 @@ export class HotDogCatcherComponent implements OnInit {
                 const newLevel = Math.floor(this.score / 100) + 1;
                 if (newLevel > this.level) {
                     this.level = newLevel;
-                    this.hotDogSpeed += 0.7; // Increase speed each level
+                    // Increase hot dog speed more rapidly as level increases
+                    // Exponential or quadratic scaling for more challenge
+                    this.hotDogSpeed += 0.7 + 0.2 * (this.level - 1) + 0.05 * Math.pow(this.level - 1, 2);
+                    // Optionally, decrease interval for more frequent hot dogs
+                    this.hotDogInterval = Math.max(400, this.hotDogInterval - 60 - 5 * (this.level - 1));
                     this.health += 1; // Increase health by one for each level up
                     if (this.level % 2 === 0) {
                         this.handSpeed += 0.5; // Slightly increase hand speed every second level
