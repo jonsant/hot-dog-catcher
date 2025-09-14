@@ -92,7 +92,7 @@ export class HotDogCatcherComponent implements OnInit {
                 this.animationFrameId = null;
             }
         } else {
-            if (this.music) this.music.play();
+            if (this.music && this.audioEnabled) this.music.play();
             this.gameLoop();
         }
     }
@@ -178,6 +178,10 @@ export class HotDogCatcherComponent implements OnInit {
     bunLoaded = false;
     hotDogImg: HTMLImageElement | null = null;
     hotDogLoaded = false;
+    audioOnImg: HTMLImageElement | null = null;
+    audioOnImgLoaded = false;
+    audioOffImg: HTMLImageElement | null = null;
+    audioOffImgLoaded = false;
 
     missedCount = 0;
     showMissedMsg = false;
@@ -189,6 +193,10 @@ export class HotDogCatcherComponent implements OnInit {
         "You're wasting delicious dogs!!!",
         "You need practice, for sure!"
     ];
+
+    // Audio control
+    audioEnabled = false; // Audio is off by default
+    audioOnIconRect = { x: 2, y: 105, width: 44, height: 44 };
 
     ngOnInit() {
         // Load plane image
@@ -216,7 +224,7 @@ export class HotDogCatcherComponent implements OnInit {
             if (this.music) {
                 if (document.hidden) {
                     this.music.pause();
-                } else if (this.gameStarted && !this.gameOver) {
+                } else if (this.gameStarted && !this.gameOver && this.audioEnabled) {
                     this.music.play();
                 }
             }
@@ -231,6 +239,31 @@ export class HotDogCatcherComponent implements OnInit {
             this.music!.currentTime = 0;
             this.music!.play();
         });
+
+        // Unlock audio context for browsers that block autoplay
+        const unlockAudio = () => {
+            if (this.music) {
+                this.music.muted = true;
+                const p = this.music.play();
+                if (p && typeof p.then === 'function') {
+                    p.then(() => {
+                        this.music!.pause();
+                        this.music!.currentTime = 0;
+                        this.music!.muted = false;
+                    }).catch(() => {
+                        // ignore
+                    });
+                } else {
+                    this.music!.pause();
+                    this.music!.currentTime = 0;
+                    this.music!.muted = false;
+                }
+            }
+            window.removeEventListener('pointerdown', unlockAudio, true);
+            window.removeEventListener('keydown', unlockAudio, true);
+        };
+        window.addEventListener('pointerdown', unlockAudio, true);
+        window.addEventListener('keydown', unlockAudio, true);
         // Load bell sound
         this.bellSound = new Audio('assets/bell.wav');
         this.bellSound.load();
@@ -275,11 +308,45 @@ export class HotDogCatcherComponent implements OnInit {
         this.catchSound = new Audio('assets/catch.wav');
         this.catchSound.load();
 
+        // Load audio on icon
+        this.audioOnImg = new Image();
+        this.audioOnImg.src = 'assets/audioon.png';
+        this.audioOnImg.onload = () => {
+            this.audioOnImgLoaded = true;
+            this.draw();
+        };
+        // Load audio off icon
+        this.audioOffImg = new Image();
+        this.audioOffImg.src = 'assets/audiooff.png';
+        this.audioOffImg.onload = () => {
+            this.audioOffImgLoaded = true;
+            this.draw();
+        };
+
         // Touch event listeners for mobile/touchscreen support
         canvas.addEventListener('touchstart', this.onTouchStart.bind(this), { passive: false });
         canvas.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
         canvas.addEventListener('touchend', this.onTouchEnd.bind(this), { passive: false });
         canvas.addEventListener('touchcancel', this.onTouchEnd.bind(this), { passive: false });
+        // Listen for clicks on the canvas to toggle audio
+        this.canvasRef.nativeElement.addEventListener('click', this.handleAudioIconClick.bind(this));
+        // Listen for touchend on the canvas to toggle audio (for mobile/touch screens)
+        this.canvasRef.nativeElement.addEventListener('touchend', (event: TouchEvent) => {
+            if (event.changedTouches.length > 0) {
+                const touch = event.changedTouches[0];
+                // Synthesize a MouseEvent-like object for handleAudioIconClick
+                const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                // Only trigger if touch is within the audio icon bounds
+                const { x: iconX, y: iconY, width, height } = this.audioOnIconRect;
+                if (x >= iconX && x <= iconX + width && y >= iconY && y <= iconY + height) {
+                    // Create a synthetic MouseEvent for compatibility
+                    const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY } as MouseEvent;
+                    this.handleAudioIconClick(fakeEvent);
+                }
+            }
+        });
     }
     // Touch event handlers
     onTouchStart(event: TouchEvent) {
@@ -371,13 +438,20 @@ export class HotDogCatcherComponent implements OnInit {
 
     startGame() {
         // Play background music at low volume
-        if (this.music) {
+        if (this.music && this.audioEnabled) {
+            this.music.pause();
             this.music.currentTime = 0;
+            this.music.load();
             this.music.volume = 0.60;
-            this.music.play();
+            const playPromise = this.music.play();
+            if (playPromise && typeof playPromise.then === 'function') {
+                playPromise.catch(() => {
+                    // Autoplay was prevented; show a message or ignore
+                });
+            }
         }
         // Play bell sound
-        if (this.bellSound) {
+        if (this.bellSound && this.audioEnabled) {
             this.bellSound.currentTime = 0;
             this.bellSound.volume = 0.60;
             this.bellSound.play();
@@ -678,7 +752,7 @@ export class HotDogCatcherComponent implements OnInit {
                 // Start mustard splash animation
                 this.startMustardSplash();
                 // Play catch sound
-                if (this.catchSound) {
+                if (this.catchSound && this.audioEnabled) {
                     this.catchSound.currentTime = 0;
                     this.catchSound.play();
                 }
@@ -774,7 +848,7 @@ export class HotDogCatcherComponent implements OnInit {
 
     endGame() {
         // Play game over sound
-        if (this.overSound) {
+        if (this.overSound && this.audioEnabled) {
             this.overSound.currentTime = 0;
             this.overSound.volume = 0.10;
             this.overSound.play();
@@ -794,6 +868,39 @@ export class HotDogCatcherComponent implements OnInit {
             this.animationFrameId = null;
         }
         this.draw();
+    }
+
+    handleAudioIconClick(event: MouseEvent) {
+        const rect = this.canvasRef.nativeElement.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const { x: iconX, y: iconY, width, height } = this.audioOnIconRect;
+        if (
+            x >= iconX && x <= iconX + width &&
+            y >= iconY && y <= iconY + height
+        ) {
+            const wasDisabled = !this.audioEnabled;
+            this.audioEnabled = !this.audioEnabled;
+            this.draw();
+            // Only play music if enabling audio AND game has started and not over
+            if (this.audioEnabled && wasDisabled && this.music && this.gameStarted && !this.gameOver) {
+                this.music.pause();
+                this.music.currentTime = 0;
+                this.music.load();
+                this.music.volume = 0.60;
+                const playPromise = this.music.play();
+                if (playPromise && typeof playPromise.then === 'function') {
+                    playPromise.catch(() => {
+                        // Autoplay was prevented; show a message or ignore
+                    });
+                }
+            }
+            // If audio is now disabled, stop music
+            if (!this.audioEnabled && !wasDisabled && this.music) {
+                this.music.pause();
+                this.music.currentTime = 0;
+            }
+        }
     }
 
     draw() {
@@ -913,7 +1020,31 @@ export class HotDogCatcherComponent implements OnInit {
             this.ctx.textBaseline = 'top';
             this.ctx.fillText('Health: ' + this.health, 10, healthIconY);
         }
-        // ...existing code...
+        // Draw audio icon below health
+        const audioIconY = healthIconY + 20;
+        this.audioOnIconRect.y = audioIconY; // keep rect in sync if layout changes
+        this.audioOnIconRect.x = 2; // keep rect in sync if layout changes
+        if (this.audioEnabled) {
+            if (this.audioOnImgLoaded && this.audioOnImg) {
+                this.ctx.globalAlpha = 1.0;
+                this.ctx.drawImage(this.audioOnImg, 2, audioIconY, 44, 44);
+                this.ctx.globalAlpha = 1.0;
+            }
+        } else {
+            // Only show audioOff icon if play button is not visible (game has started at least once)
+            if (!this.showPlayButton) {
+                if (this.audioOffImgLoaded && this.audioOffImg) {
+                    this.ctx.globalAlpha = 1.0;
+                    this.ctx.drawImage(this.audioOffImg, 2, audioIconY, 44, 44);
+                    this.ctx.globalAlpha = 1.0;
+                } else if (this.audioOnImgLoaded && this.audioOnImg) {
+                    // fallback: show audioOn icon faded if audioOff not loaded
+                    this.ctx.globalAlpha = 0.4;
+                    this.ctx.drawImage(this.audioOnImg, 2, audioIconY, 44, 44);
+                    this.ctx.globalAlpha = 1.0;
+                }
+            }
+        }
     }
 
     ngOnDestroy() {
